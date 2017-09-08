@@ -31,10 +31,29 @@
   'use strict';
 
   $.fn.idle = function (options) {
+    if (!options) {
+        options = {};
+    }
+
+    var events = ['mousemove', 'keydown', 'mousedown', 'touchstart'];
+    var visibilityEvent = 'visibilitychange';
+
+    var namespaceDefault = 'idle';
+    var namespace = options.namespace || namespaceDefault;
+
     var defaults = {
-        idle: 60000, //idle time in ms
-        events: 'mousemove.jqueryidle keydown.jqueryidle mousedown.jqueryidle touchstart.jqueryidle', //events that will trigger the idle resetter
-        visibilityEvents: 'visibilitychange.jqueryidle webkitvisibilitychange.jqueryidle mozvisibilitychange.jqueryidle msvisibilitychange.jqueryidle',
+        // idle time in ms
+        idle: 60000,
+
+        namespace: namespaceDefault,
+
+        // events that will trigger the idle resetter
+        events: events.map(function(event) {
+            return event + '.' + namespace;
+        }).join(' '),
+
+        visibilityEvent: visibilityEvent + '.' + namespace,
+
         onIdle: function () {}, //callback function to be executed after idle time
         onActive: function () {}, //callback function to be executed after back from idleness
         onHide: function () {}, //callback function to be executed when window is hidden
@@ -50,10 +69,12 @@
       resetTimeout,
       timeout;
 
-    //event to clear all idle events
-    $(this).on( "idle:stop", {}, function( event) {
+    // event to clear all idle events
+    var stopEventName = namespace + ':stop';
+    $(this).on(stopEventName, {}, function(event) {
+      $(this).off(stopEventName);
       $(this).off(settings.events);
-      $(document).off(settings.visibilityEvents);
+      $(document).off(settings.visibilityEvent);
       settings.keepTracking = false;
       resetTimeout(lastId, settings);
     });
@@ -84,8 +105,8 @@
         lastId = resetTimeout(lastId, settings);
       });
       if (settings.onShow || settings.onHide) {
-        $(document).on(settings.visibilityEvents, function () {
-          if (document.hidden || document.webkitHidden || document.mozHidden || document.msHidden) {
+        $(document).on(settings.visibilityEvent, function () {
+          if (document.hidden) {
             if (visible) {
               visible = false;
               settings.onHide.call();
