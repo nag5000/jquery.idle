@@ -35,7 +35,14 @@
         options = {};
     }
 
-    var events = ['mousemove', 'keydown', 'mousedown', 'touchstart'];
+    var events = [
+        'mousemove', 'keydown', 'mousedown', 'touchstart',
+
+        // For the moment not all modern browsers are implementing
+        // the unprefixed version of the Fullscreen API.
+        'fullscreenchange', 'webkitfullscreenchange',
+        'mozfullscreenchange', 'MSFullscreenChange'
+    ];
     var visibilityEvent = 'visibilitychange';
 
     var namespaceDefault = 'idle';
@@ -60,14 +67,16 @@
         onShow: function () {}, //callback function to be executed when window is visible
         keepTracking: true, //set it to false if you want to track only the first time
         startAtIdle: false,
-        recurIdleCall: false
+        recurIdleCall: false,
+        trackingInFullscreenMode: false
       },
       idle = options.startAtIdle || false,
       visible = !options.startAtIdle || true,
       settings = $.extend({}, defaults, options),
       lastId = null,
       resetTimeout,
-      timeout;
+      timeout,
+      isFullscreenMode;
 
     // event to clear all idle events
     var stopEventName = namespace + ':stop';
@@ -84,8 +93,9 @@
         idle = false;
         settings.onActive.call();
       }
+
       clearTimeout(id);
-      if(settings.keepTracking) {
+      if (settings.keepTracking) {
         return timeout(settings);
       }
     };
@@ -93,10 +103,28 @@
     timeout = function (settings) {
       var timer = (settings.recurIdleCall ? setInterval : setTimeout), id;
       id = timer(function () {
+        if (!settings.trackingInFullscreenMode && isFullscreenMode()) {
+            return;
+        }
+
         idle = true;
         settings.onIdle.call();
       }, settings.idle);
       return id;
+    };
+
+    // For the moment not all modern browsers are implementing
+    // the unprefixed version of the Fullscreen API.
+    isFullscreenMode = function() {
+        // "document.fullscreen" with prefixed versions is not used
+        // because IE11 does not have this property.
+        var fullscreenElement = document.fullscreenElement
+            || document.webkitFullscreenElement
+            || document.mozFullScreenElement
+            || document.msFullscreenElement
+            || null;
+
+        return !!fullscreenElement;
     };
 
     return this.each(function () {
@@ -104,6 +132,7 @@
       $(this).on(settings.events, function (e) {
         lastId = resetTimeout(lastId, settings);
       });
+
       if (settings.onShow || settings.onHide) {
         $(document).on(settings.visibilityEvent, function () {
           if (document.hidden) {
